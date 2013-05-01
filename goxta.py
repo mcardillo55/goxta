@@ -2,6 +2,14 @@ import time
 import math
 import sys
 import TaLib
+import json
+import websocket
+import urllib2
+import socket
+
+interval = 1*60     #interval period in seconds
+MTGOX_SOCKET = "wss://websocket.mtgox.com/mtgox?Currency=USD"
+TIMEOUT=10
 
 class IntervalList:
     def __init__(self):
@@ -18,6 +26,8 @@ class IntervalList:
         for interval in self.intList:
            closeList.append(interval.close) 
         return closeList
+    def printIntervalAt(self, n):
+        self.intList[n].printInterval()
     def printFullList(self):
         for interval in self.intList:
             print "INTERVAL ID: %d" % interval.intervalID
@@ -31,9 +41,6 @@ class Interval:
         self.trades = [open]
         self.high = open.price
         self.low = open.price
-    def printTrades(self):
-        for trade in self.trades:
-            trade.printTrade()
     def addTrade(self, trade):
         self.trades.append(trade)
         self.close = trade.price
@@ -41,13 +48,18 @@ class Interval:
             self.high = trade.price
         if trade.price < self.low:
             self.low = trade.price
+    def printInterval(self):
+        print ("ID: %d\tOpen: %.6g\tClose: %.6g\tHigh: %.6g\tLow: %.6g") % \
+                (self.intervalID, self.open, self.close, self.high, self.low)
+    def printTrades(self):
+        for trade in self.trades:
+            trade.printTrade()
 
 class Trade:
     def __init__(self, tradeData):
-        splitData = tradeData.split(',')
-        self.time = int(splitData[0]) #unix time
-        self.price = float(splitData[1])
-        self.volume = float(splitData[2])
+        self.time = int(tradeData[0]) #unix time
+        self.price = float(tradeData[1])
+        self.volume = float(tradeData[2])
         self.intervalID = int(math.floor(self.time/interval))
     def printTrade(self):
         print "Time: %s\tPrice: %f\tVolume: %f" % (time.ctime(self.time), self.price, self.volume)
@@ -76,15 +88,37 @@ class MovingAverage(Indicator):
     def compute(self, closeList):
         return self.TA_pad_zeros(TaLib.TA_MA(0, len(closeList)-1, closeList, self.period))[-1]
 
-interval = 5*60     #in seconds
-tradeData = open('data')
+def connect_mtgox():
+    print "Connecting to MtGox websocket..."
+    sock = websocket.create_connection(MTGOX_SOCKET, TIMEOUT)
+    print "Connected!"
+    subscribe_cmd = "{'op':'mtgox.subscribe', 'type':'lag'}"
+    sock.send(subscribe_cmd)
+    sock.recv()
+    return sock 
+    
+def get_mtgoxdata(sock):
+    try:
+        data = json.loads(sock.recv())
+    except socket.timeout:
+        print "Timed out. Retrying"
+        return None
+    return data
+
+    
 intList = IntervalList()
+mtgox = connect_mtgox()
+while True:
+    mtdata = get_mtgoxdata(mtgox)
+    if (mtdata['channel'] == "dbf1dee9-4f2e-4a08-8cb7-748919a71b21") and (mtdata['trade']['price_currency'] == "USD"):
+        mtTrade = mtdata['trade']
+        curTrade = Trade((mtTrade['date'], mtTrade['price'], mtTrade['amount']))
+        curTrade.printTrade()
+        if intList.empty() or curTrade.intervalID != curInterval.intervalID:
+            curInterval = Interval(curTrade)
+            intList.addInterval(curInterval)
+            intList.printIntervalAt(-1)
+        else:
+            curInterval.addTrade(curTrade)
 
-for dataLine in tradeData:
-    curTrade = Trade(dataLine)
 
-    if intList.empty() or curTrade.intervalID != curInterval.intervalID:
-        curInterval = Interval(curTrade)
-        intList.addInterval(curInterval)
-    else:
-        curInterval.addTrade(curTrade)
