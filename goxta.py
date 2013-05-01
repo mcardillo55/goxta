@@ -3,9 +3,29 @@ import math
 import sys
 import TaLib
 
+class IntervalList:
+    def __init__(self):
+        self.intList = []
+    def addInterval(self, newInterval):
+        self.intList.append(newInterval)
+    def empty(self):
+        if self.intList == []:
+            return True
+        else:
+            return False
+    def closings(self):
+        closeList = []
+        for interval in self.intList:
+           closeList.append(interval.close) 
+        return closeList
+    def printFullList(self):
+        for interval in self.intList:
+            print "INTERVAL ID: %d" % interval.intervalID
+            interval.printTrades()
+
 class Interval:
     def __init__(self, open):
-        self.name = time.ctime(open.time)
+        self.intervalID = open.intervalID
         self.open = open.price
         self.close = open.price
         self.trades = [open]
@@ -28,6 +48,7 @@ class Trade:
         self.time = int(splitData[0]) #unix time
         self.price = float(splitData[1])
         self.volume = float(splitData[2])
+        self.intervalID = int(math.floor(self.time/interval))
     def printTrade(self):
         print "Time: %s\tPrice: %f\tVolume: %f" % (time.ctime(self.time), self.price, self.volume)
 
@@ -52,51 +73,18 @@ class Indicator:
 class MovingAverage(Indicator):
     def __init__(self, t=10):
         self.period = t
-        self.closeList = []
-    def compute(self):
-        return self.TA_pad_zeros(TaLib.TA_MA(0, len(self.closeList)-1, self.closeList, self.period))[-1]
-    def updateCloseList(self, newCloseList):
-        if self.closeList == []:
-            self.closeList = [newCloseList]
-        else:
-            self.closeList.append(newCloseList)
+    def compute(self, closeList):
+        return self.TA_pad_zeros(TaLib.TA_MA(0, len(closeList)-1, closeList, self.period))[-1]
 
-def printIntClosing(inter, n):
-    print "INTERVAL: " + str(n)
-#    print "H: %f\tL: %f\tO: %f\tC: %f\t SMA: %f" % (inter.high, inter.low, inter.open, inter.close, sma[-1])
-#    inter.printTrades() 
-
-def closings(intlist, start, end):
-    ret = []
-    for inter in intlist[start:end]:
-        ret.append(inter.close)
-    return ret
-
-interval = 5
+interval = 5*60     #in seconds
 tradeData = open('data')
-intervalList = [] 
-sma = MovingAverage()
+intList = IntervalList()
 
-n=0
 for dataLine in tradeData:
     curTrade = Trade(dataLine)
-    tradeTime = time.gmtime(curTrade.time)
-    hour = getattr(tradeTime, 'tm_hour')
-    min = getattr(tradeTime, 'tm_min')
-    curInterval = math.floor(min/interval)
-    #print "%d %d" % (min, curInterval)
 
-    if  intervalList == [] or oldInterval != curInterval:
-        if intervalList != []:
-            n+=1
-            #printIntClosing(intervalGroup, n)
-            sma.updateCloseList(intervalGroup.close)
-            print sma.compute()
-        intervalGroup = Interval(curTrade)
-        intervalList.append(intervalGroup)
+    if intList.empty() or curTrade.intervalID != curInterval.intervalID:
+        curInterval = Interval(curTrade)
+        intList.addInterval(curInterval)
     else:
-        intervalGroup.addTrade(curTrade)
-
-    oldInterval=curInterval
-
-
+        curInterval.addTrade(curTrade)
