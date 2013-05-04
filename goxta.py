@@ -6,6 +6,9 @@ import json
 import websocket
 import urllib2
 import socket
+import hashlib
+import hmac
+import base64
 
 interval = 1*60     #interval period in seconds
 BTCCHARTS_URL = "http://api.bitcoincharts.com/v1/trades.csv?symbol=mtgoxUSD"
@@ -17,6 +20,7 @@ class IntervalList:
         self.intList = []
         self.sma = MovingAverage()
         self.rsi = RSI()
+        self.macd = MACD()
     def addInterval(self, newInterval):
         self.intList.append(newInterval)
     def empty(self):
@@ -33,6 +37,7 @@ class IntervalList:
         self.intList[n].printInterval()
         print "SMA: %.6g" % (self.sma.compute(self.closings()))
         print "RSI: %.6g" % (self.rsi.compute(self.closings()))
+        print self.macd.compute(self.closings())
     def printFullList(self):
         for interval in self.intList:
             print "INTERVAL ID: %d" % interval.intervalID
@@ -101,22 +106,82 @@ class RSI(Indicator):
     def compute(self, closeList):
         return self.TA_pad_zeros(TaLib.TA_RSI(0, len(closeList)-1, closeList, self.period))[-1]
 
-def connect_mtgox():
-    print "Connecting to MtGox websocket..."
-    sock = websocket.create_connection(MTGOX_SOCKET, TIMEOUT)
-    print "Connected!"
-    subscribe_cmd = "{'op':'mtgox.subscribe', 'type':'lag'}"
-    sock.send(subscribe_cmd)
-    sock.recv()
-    return sock 
-    
-def get_mtgoxdata(sock):
-    try:
-        data = json.loads(sock.recv())
-    except socket.timeout:
-        print "Timed out. Retrying"
-        return None
-    return data
+class MACD(Indicator):
+    def __init__(self, shortt=12, longt=26, sigt=9):
+        self.shortt = shortt
+        self.longt = longt
+        self.sigt = sigt
+    def compute(self, closeList):
+        return self.TA_pad_zeros(TaLib.TA_MACD(0, len(closeList)-1, closeList, self.shortt, \
+                    self.longt, self.sigt))[-1]
+
+class GoxAPI():
+    def __init__(self):
+        self.socket = None
+        keydata = open("keydata.conf", "r")
+        keyjson = json.loads(keydata.read())
+        self.key = keyjson['key']
+        self.secret = keyjson['secret']
+        keydata.close()
+    def connect(self):
+        print "Connecting to MtGox websocket..."
+        sock = websocket.create_connection(MTGOX_SOCKET, TIMEOUT)
+        print "Connected!"
+        subscribe_cmd = "{'op':'mtgox.subscribe', 'type':'lag'}"
+        sock.send(subscribe_cmd)
+        sock.recv()
+        self.socket = sock
+        return sock 
+    def getNonce(self):
+        return str(time.time())
+    def getTrades(self):
+        if self.socket is not None:
+            try:
+                data = json.loads(self.socket.recv())
+            except socket.timeout:
+                print "Timed out. Retrying"
+                return None
+            return data
+        else:
+            print "Error: Not connected to mtGox socket"
+            return None
+    def buy (self, price, vol):
+        price = int(price * 1E5)
+        vol = int(vol * 1E8)
+        params = {
+            "type"      : "bid",
+            "amount_int": vol,
+            "price_int" : price}
+        self.sendSignedCall(params)
+    def sell(self, price, vol):
+        price = int(price * 1E5)
+        vol = int(vol * 1E8)
+        params = {
+            "type"      : "ask",
+            "amount_int": vol,
+            "price_int" : price}
+        self.sendSignedCall(params)
+    def sendSignedCall(self, params):
+        nonce = self.getNonce()
+        reqId = hashlib.md5(nonce).hexdigest()
+
+        req = json.dumps({
+            "id"        : reqId,
+            "call"      : "order/add",
+            "nonce"     : nonce,
+            "params"    : params,
+            "currency"  : "USD",
+            "item"      : "BTC"})
+         
+        signedReq = hmac.new(base64.b64decode(self.secret), req, hashlib.sha512).digest()
+        signedAndEncodedCall = base64.b64encode(self.key.replace("-","").decode("hex")  + signedReq + req)
+        call = json.dumps({
+            "op"        : "call",
+            "call"      : signedAndEncodedCall,
+            "id"        : reqId,
+            "context"   : "mtgox.com"})
+
+        self.socket.send(call)
 
 intList = IntervalList()
 
@@ -135,11 +200,12 @@ if (True): ##placeholder for cmdline parameter
             curInterval.addTrade(curTrade)
     print "Complete!"
     
-mtgox = connect_mtgox()
+mtgox = GoxAPI()
+mtgox.connect()
 
 while True:
     try:
-        mtdata = get_mtgoxdata(mtgox)
+        mtdata = mtgox.getTrades()
     except Exception, e:
         print e
         continue
