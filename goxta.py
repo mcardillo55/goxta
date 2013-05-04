@@ -8,12 +8,14 @@ import urllib2
 import socket
 
 interval = 1*60     #interval period in seconds
+BTCCHARTS_URL = "http://api.bitcoincharts.com/v1/trades.csv?symbol=mtgoxUSD"
 MTGOX_SOCKET = "wss://websocket.mtgox.com/mtgox?Currency=USD"
 TIMEOUT=10
 
 class IntervalList:
     def __init__(self):
         self.intList = []
+        self.sma = MovingAverage(5)
     def addInterval(self, newInterval):
         self.intList.append(newInterval)
     def empty(self):
@@ -28,6 +30,7 @@ class IntervalList:
         return closeList
     def printIntervalAt(self, n):
         self.intList[n].printInterval()
+        print "SMA: %.6g" % (self.sma.compute(self.closings()))
     def printFullList(self):
         for interval in self.intList:
             print "INTERVAL ID: %d" % interval.intervalID
@@ -41,16 +44,18 @@ class Interval:
         self.trades = [open]
         self.high = open.price
         self.low = open.price
+        self.volume = open.volume
     def addTrade(self, trade):
         self.trades.append(trade)
+        self.volume = self.volume + trade.volume
         self.close = trade.price
         if trade.price > self.high:
             self.high = trade.price
         if trade.price < self.low:
             self.low = trade.price
     def printInterval(self):
-        print ("ID: %d\tOpen: %.6g\tClose: %.6g\tHigh: %.6g\tLow: %.6g") % \
-                (self.intervalID, self.open, self.close, self.high, self.low)
+        print ("ID: %d\tOpen: %.6g\tClose: %.6g\tHigh: %.6g\tLow: %.6g\tVol: %.6g") % \
+                (self.intervalID, self.open, self.close, self.high, self.low, self.volume)
     def printTrades(self):
         for trade in self.trades:
             trade.printTrade()
@@ -105,19 +110,39 @@ def get_mtgoxdata(sock):
         return None
     return data
 
-    
 intList = IntervalList()
+
+if (False): ##placeholder for cmdline parameter
+    start_data = urllib2.urlopen(BTCCHARTS_URL)
+    for line in reversed(start_data.readlines()):
+        curTrade = Trade(tuple(line.split(",")))
+        curTrade.printTrade()
+        if intList.empty() or curTrade.intervalID != curInterval.intervalID:
+            curInterval = Interval(curTrade)
+            if not intList.empty():
+                intList.printIntervalAt(-1)
+            intList.addInterval(curInterval)
+        else:
+            curInterval.addTrade(curTrade)
+    
 mtgox = connect_mtgox()
+
 while True:
-    mtdata = get_mtgoxdata(mtgox)
+    try:
+        mtdata = get_mtgoxdata(mtgox)
+    except Exception, e:
+        print e
+        continue
+
     if (mtdata['channel'] == "dbf1dee9-4f2e-4a08-8cb7-748919a71b21") and (mtdata['trade']['price_currency'] == "USD"):
         mtTrade = mtdata['trade']
         curTrade = Trade((mtTrade['date'], mtTrade['price'], mtTrade['amount']))
         curTrade.printTrade()
         if intList.empty() or curTrade.intervalID != curInterval.intervalID:
             curInterval = Interval(curTrade)
+            if not intList.empty():
+                intList.printIntervalAt(-1)
             intList.addInterval(curInterval)
-            intList.printIntervalAt(-1)
         else:
             curInterval.addTrade(curTrade)
 
