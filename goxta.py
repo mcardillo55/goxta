@@ -15,7 +15,8 @@ TIMEOUT=10
 class IntervalList:
     def __init__(self):
         self.intList = []
-        self.sma = MovingAverage(5)
+        self.sma = MovingAverage()
+        self.rsi = RSI()
     def addInterval(self, newInterval):
         self.intList.append(newInterval)
     def empty(self):
@@ -31,6 +32,7 @@ class IntervalList:
     def printIntervalAt(self, n):
         self.intList[n].printInterval()
         print "SMA: %.6g" % (self.sma.compute(self.closings()))
+        print "RSI: %.6g" % (self.rsi.compute(self.closings()))
     def printFullList(self):
         for interval in self.intList:
             print "INTERVAL ID: %d" % interval.intervalID
@@ -88,10 +90,16 @@ class Indicator:
         return nseq
 
 class MovingAverage(Indicator):
-    def __init__(self, t=10):
+    def __init__(self, t=50):
         self.period = t
     def compute(self, closeList):
         return self.TA_pad_zeros(TaLib.TA_MA(0, len(closeList)-1, closeList, self.period))[-1]
+
+class RSI(Indicator):
+    def __init__(self, t=14):
+        self.period = t
+    def compute(self, closeList):
+        return self.TA_pad_zeros(TaLib.TA_RSI(0, len(closeList)-1, closeList, self.period))[-1]
 
 def connect_mtgox():
     print "Connecting to MtGox websocket..."
@@ -112,18 +120,20 @@ def get_mtgoxdata(sock):
 
 intList = IntervalList()
 
-if (False): ##placeholder for cmdline parameter
+if (True): ##placeholder for cmdline parameter
+    print "Fetching history from bitcoincharts.com..."
     start_data = urllib2.urlopen(BTCCHARTS_URL)
     for line in reversed(start_data.readlines()):
         curTrade = Trade(tuple(line.split(",")))
-        curTrade.printTrade()
+        #curTrade.printTrade()
         if intList.empty() or curTrade.intervalID != curInterval.intervalID:
             curInterval = Interval(curTrade)
-            if not intList.empty():
-                intList.printIntervalAt(-1)
+            #if not intList.empty():
+                #intList.printIntervalAt(-1)
             intList.addInterval(curInterval)
         else:
             curInterval.addTrade(curTrade)
+    print "Complete!"
     
 mtgox = connect_mtgox()
 
@@ -134,16 +144,19 @@ while True:
         print e
         continue
 
-    if (mtdata['channel'] == "dbf1dee9-4f2e-4a08-8cb7-748919a71b21") and (mtdata['trade']['price_currency'] == "USD"):
-        mtTrade = mtdata['trade']
-        curTrade = Trade((mtTrade['date'], mtTrade['price'], mtTrade['amount']))
-        curTrade.printTrade()
-        if intList.empty() or curTrade.intervalID != curInterval.intervalID:
-            curInterval = Interval(curTrade)
-            if not intList.empty():
-                intList.printIntervalAt(-1)
-            intList.addInterval(curInterval)
-        else:
-            curInterval.addTrade(curTrade)
+    try:
+        if (mtdata['channel'] == "dbf1dee9-4f2e-4a08-8cb7-748919a71b21") and (mtdata['trade']['price_currency'] == "USD"):
+            mtTrade = mtdata['trade']
+            curTrade = Trade((mtTrade['date'], mtTrade['price'], mtTrade['amount']))
+            curTrade.printTrade()
+            if intList.empty() or curTrade.intervalID != curInterval.intervalID:
+                curInterval = Interval(curTrade)
+                if not intList.empty():
+                    intList.printIntervalAt(-1)
+                intList.addInterval(curInterval)
+            else:
+                curInterval.addTrade(curTrade)
+    except Exception, e:
+        continue
 
 
