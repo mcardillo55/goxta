@@ -31,8 +31,8 @@ class GoxAPI():
         if self.socket is not None:
             try:
                 data = json.loads(self.socket.recv())
-            except socket.timeout:
-                print "Timed out. Retrying"
+            except Exception, e:
+                print e
                 return None
             return data
         else:
