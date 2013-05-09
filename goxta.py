@@ -10,13 +10,13 @@ import hashlib
 import hmac
 import base64
 
-interval = 1*60     #interval period in seconds
 BTCCHARTS_URL = "http://api.bitcoincharts.com/v1/trades.csv?symbol=mtgoxUSD"
 MTGOX_SOCKET = "wss://websocket.mtgox.com/mtgox?Currency=USD"
 TIMEOUT=10
 
 class IntervalList:
-    def __init__(self, indicators = ()):
+    def __init__(self, intervalPeriod = 1, indicators = ()):
+        self.intervalPeriod = intervalPeriod*60     #interval period in seconds
         self.intList = []
         self.indicators = indicators
     def addInterval(self, newInterval):
@@ -31,6 +31,8 @@ class IntervalList:
         for interval in self.intList:
            closeList.append(interval.close) 
         return closeList
+    def getIntervalPeriod(self):
+        return self.intervalPeriod
     def printIntervalAt(self, n):
         self.intList[n].printInterval()
         self.printIndicators()
@@ -68,11 +70,11 @@ class Interval:
             trade.printTrade()
 
 class Trade:
-    def __init__(self, tradeData):
+    def __init__(self, (tradeData), intervalPeriod):
         self.time = int(tradeData[0]) #unix time
         self.price = float(tradeData[1])
         self.volume = float(tradeData[2])
-        self.intervalID = int(math.floor(self.time/interval))
+        self.intervalID = int(math.floor(self.time/intervalPeriod))
     def printTrade(self):
         print "Time: %s\tPrice: %f\tVolume: %f" % (time.ctime(self.time), self.price, self.volume)
 
@@ -196,18 +198,18 @@ class GoxAPI():
 
         self.socket.send(call)
 
-intList = IntervalList((MovingAverage(), RSI(), MACD()))
+intList = IntervalList(indicators=(MovingAverage(), RSI(), MACD()))
 
 if (True): ##placeholder for cmdline parameter
     print "Fetching history from bitcoincharts.com..."
     start_data = urllib2.urlopen(BTCCHARTS_URL)
     for line in reversed(start_data.readlines()):
-        curTrade = Trade(tuple(line.split(",")))
+        curTrade = Trade(tuple(line.split(",")), intList.getIntervalPeriod())
         #curTrade.printTrade()
         if intList.empty() or curTrade.intervalID != curInterval.intervalID:
             curInterval = Interval(curTrade)
-            #if not intList.empty():
-                #intList.printIntervalAt(-1)
+            if not intList.empty():
+                intList.printIntervalAt(-1)
             intList.addInterval(curInterval)
         else:
             curInterval.addTrade(curTrade)
@@ -226,7 +228,7 @@ while True:
     try:
         if (mtdata['channel'] == "dbf1dee9-4f2e-4a08-8cb7-748919a71b21") and (mtdata['trade']['price_currency'] == "USD"):
             mtTrade = mtdata['trade']
-            curTrade = Trade((mtTrade['date'], mtTrade['price'], mtTrade['amount']))
+            curTrade = Trade((mtTrade['date'], mtTrade['price'], mtTrade['amount']), intList.getIntervalPeriod())
             curTrade.printTrade()
             if intList.empty() or curTrade.intervalID != curInterval.intervalID:
                 curInterval = Interval(curTrade)
