@@ -152,7 +152,7 @@ class GoxAPI():
             "type"      : "bid",
             "amount_int": vol,
             "price_int" : price}
-        self.sendSignedCall(params)
+        self.sendSignedCall("order/add", params)
     def sell(self, price, vol):
         price = int(price * 1E5)
         vol = int(vol * 1E8)
@@ -160,14 +160,18 @@ class GoxAPI():
             "type"      : "ask",
             "amount_int": vol,
             "price_int" : price}
-        self.sendSignedCall(params)
-    def sendSignedCall(self, params):
+        self.sendSignedCall("order/add", params)
+    def cancel(self, oid):
+        params = {
+            "oid"       : oid}
+        self.sendSignedCall("order/cancel", params)
+    def sendSignedCall(self, api, params):
         nonce = self.getNonce()
         reqId = hashlib.md5(nonce).hexdigest()
 
         req = json.dumps({
             "id"        : reqId,
-            "call"      : "order/add",
+            "call"      : api,
             "nonce"     : nonce,
             "params"    : params,
             "currency"  : "USD",
