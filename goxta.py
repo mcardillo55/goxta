@@ -1,5 +1,6 @@
 from indicators import *
 from goxapi import *
+import argparse
 import time
 import math
 import sys
@@ -71,9 +72,13 @@ class Trade:
     def printTrade(self):
         print "Time: %s\tPrice: %f\tVolume: %f" % (time.ctime(self.time), self.price, self.volume)
 
+parser = argparse.ArgumentParser(description="Analyze and trade Bitcoin on mtGox")
+parser.add_argument("--no-hist", dest="history", action="store_false", help="Disable fetching bitcoincharts.com history")
+args = parser.parse_args()
+
 intList = IntervalList(indicators=(MovingAverage(), RSI(), MACD()))
 
-if (False): ##placeholder for cmdline parameter
+if (args.history):
     print "Fetching history from bitcoincharts.com..."
     start_data = urllib2.urlopen(BTCCHARTS_URL)
     for line in reversed(start_data.readlines()):
@@ -81,8 +86,8 @@ if (False): ##placeholder for cmdline parameter
         #curTrade.printTrade()
         if intList.empty() or curTrade.intervalID != curInterval.intervalID:
             curInterval = Interval(curTrade)
-            if not intList.empty():
-                intList.printIntervalAt(-1)
+            #if not intList.empty():
+                #intList.printIntervalAt(-1)
             intList.addInterval(curInterval)
         else:
             curInterval.addTrade(curTrade)
