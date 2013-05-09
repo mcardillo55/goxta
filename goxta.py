@@ -1,18 +1,11 @@
+from indicators import *
+from goxapi import *
 import time
 import math
 import sys
-import TaLib
-import json
-import websocket
 import urllib2
-import socket
-import hashlib
-import hmac
-import base64
 
 BTCCHARTS_URL = "http://api.bitcoincharts.com/v1/trades.csv?symbol=mtgoxUSD"
-MTGOX_SOCKET = "wss://websocket.mtgox.com/mtgox?Currency=USD"
-TIMEOUT=10
 
 class IntervalList:
     def __init__(self, intervalPeriod = 1, indicators = ()):
@@ -78,129 +71,9 @@ class Trade:
     def printTrade(self):
         print "Time: %s\tPrice: %f\tVolume: %f" % (time.ctime(self.time), self.price, self.volume)
 
-class Indicator:
-    def compute(self, closeList):
-        raise NotImplementedError
-    def display(self, closeList):
-        raise NotImplementedError
-
-    def TA_pad_zeros(self, argvs):
-        end = argvs[1]
-        try:
-            seq = argvs[2]
-        except:
-            seq = [0,0]
-        end = int(end)
-        nseq = []
-        for x in range(end):
-            nseq.append(0)
-        for x in seq:
-            nseq.append(x)
-        return nseq
-
-class MovingAverage(Indicator):
-    def __init__(self, t=50):
-        self.period = t
-    def compute(self, closeList):
-        return self.TA_pad_zeros(TaLib.TA_MA(0, len(closeList)-1, closeList, self.period))[-1]
-    def display(self, closeList):
-        print "SMA: %.6g" % (self.compute(closeList))
-
-class RSI(Indicator):
-    def __init__(self, t=14):
-        self.period = t
-    def compute(self, closeList):
-        return self.TA_pad_zeros(TaLib.TA_RSI(0, len(closeList)-1, closeList, self.period))[-1]
-    def display(self, closeList):
-        print "RSI: %.6g" % (self.compute(closeList))
-
-
-class MACD(Indicator):
-    def __init__(self, shortt=12, longt=26, sigt=9):
-        self.shortt = shortt
-        self.longt = longt
-        self.sigt = sigt
-    def compute(self, closeList):
-        return self.TA_pad_zeros(TaLib.TA_MACD(0, len(closeList)-1, closeList, self.shortt, \
-                    self.longt, self.sigt))[-1]
-    def display(self, closeList):
-        print "MACD: %.6g" % self.compute(closeList)
-
-class GoxAPI():
-    def __init__(self):
-        self.socket = None
-        keydata = open("keydata.conf", "r")
-        keyjson = json.loads(keydata.read())
-        self.key = keyjson['key']
-        self.secret = keyjson['secret']
-        keydata.close()
-    def connect(self):
-        print "Connecting to MtGox websocket..."
-        sock = websocket.create_connection(MTGOX_SOCKET, TIMEOUT)
-        print "Connected!"
-        subscribe_cmd = "{'op':'mtgox.subscribe', 'type':'lag'}"
-        sock.send(subscribe_cmd)
-        sock.recv()
-        self.socket = sock
-        return sock 
-    def getNonce(self):
-        return str(time.time())
-    def getTrades(self):
-        if self.socket is not None:
-            try:
-                data = json.loads(self.socket.recv())
-            except socket.timeout:
-                print "Timed out. Retrying"
-                return None
-            return data
-        else:
-            print "Error: Not connected to mtGox socket"
-            return None
-    def buy (self, price, vol):
-        price = int(price * 1E5)
-        vol = int(vol * 1E8)
-        params = {
-            "type"      : "bid",
-            "amount_int": vol,
-            "price_int" : price}
-        self.sendSignedCall("order/add", params)
-    def sell(self, price, vol):
-        price = int(price * 1E5)
-        vol = int(vol * 1E8)
-        params = {
-            "type"      : "ask",
-            "amount_int": vol,
-            "price_int" : price}
-        self.sendSignedCall("order/add", params)
-    def cancel(self, oid):
-        params = {
-            "oid"       : oid}
-        self.sendSignedCall("order/cancel", params)
-    def sendSignedCall(self, api, params):
-        nonce = self.getNonce()
-        reqId = hashlib.md5(nonce).hexdigest()
-
-        req = json.dumps({
-            "id"        : reqId,
-            "call"      : api,
-            "nonce"     : nonce,
-            "params"    : params,
-            "currency"  : "USD",
-            "item"      : "BTC"})
-         
-        signedReq = hmac.new(base64.b64decode(self.secret), req, hashlib.sha512).digest()
-        signedAndEncodedCall = base64.b64encode(self.key.replace("-","").decode("hex")  + signedReq + req)
-        call = json.dumps({
-            "op"        : "call",
-            "call"      : signedAndEncodedCall,
-            "id"        : reqId,
-            "context"   : "mtgox.com"})
-
-        self.socket.send(call)
-
 intList = IntervalList(indicators=(MovingAverage(), RSI(), MACD()))
 
-if (True): ##placeholder for cmdline parameter
+if (False): ##placeholder for cmdline parameter
     print "Fetching history from bitcoincharts.com..."
     start_data = urllib2.urlopen(BTCCHARTS_URL)
     for line in reversed(start_data.readlines()):

@@ -2,3 +2,4 @@ TaLib.py
 TaLib.pyc
 _TaLib.so
 keydata.conf
+*.pyc
