@@ -16,11 +16,9 @@ MTGOX_SOCKET = "wss://websocket.mtgox.com/mtgox?Currency=USD"
 TIMEOUT=10
 
 class IntervalList:
-    def __init__(self):
+    def __init__(self, indicators = ()):
         self.intList = []
-        self.sma = MovingAverage()
-        self.rsi = RSI()
-        self.macd = MACD()
+        self.indicators = indicators
     def addInterval(self, newInterval):
         self.intList.append(newInterval)
     def empty(self):
@@ -35,13 +33,15 @@ class IntervalList:
         return closeList
     def printIntervalAt(self, n):
         self.intList[n].printInterval()
-        print "SMA: %.6g" % (self.sma.compute(self.closings()))
-        print "RSI: %.6g" % (self.rsi.compute(self.closings()))
-        print self.macd.compute(self.closings())
+        self.printIndicators()
     def printFullList(self):
         for interval in self.intList:
             print "INTERVAL ID: %d" % interval.intervalID
             interval.printTrades()
+    def printIndicators(self):
+        closings = self.closings()
+        for curInd in self.indicators:
+            curInd.display(closings)
 
 class Interval:
     def __init__(self, open):
@@ -77,7 +77,9 @@ class Trade:
         print "Time: %s\tPrice: %f\tVolume: %f" % (time.ctime(self.time), self.price, self.volume)
 
 class Indicator:
-    def compute(self):
+    def compute(self, closeList):
+        raise NotImplementedError
+    def display(self, closeList):
         raise NotImplementedError
 
     def TA_pad_zeros(self, argvs):
@@ -99,12 +101,17 @@ class MovingAverage(Indicator):
         self.period = t
     def compute(self, closeList):
         return self.TA_pad_zeros(TaLib.TA_MA(0, len(closeList)-1, closeList, self.period))[-1]
+    def display(self, closeList):
+        print "SMA: %.6g" % (self.compute(closeList))
 
 class RSI(Indicator):
     def __init__(self, t=14):
         self.period = t
     def compute(self, closeList):
         return self.TA_pad_zeros(TaLib.TA_RSI(0, len(closeList)-1, closeList, self.period))[-1]
+    def display(self, closeList):
+        print "RSI: %.6g" % (self.compute(closeList))
+
 
 class MACD(Indicator):
     def __init__(self, shortt=12, longt=26, sigt=9):
@@ -114,6 +121,8 @@ class MACD(Indicator):
     def compute(self, closeList):
         return self.TA_pad_zeros(TaLib.TA_MACD(0, len(closeList)-1, closeList, self.shortt, \
                     self.longt, self.sigt))[-1]
+    def display(self, closeList):
+        print "MACD: %.6g" % self.compute(closeList)
 
 class GoxAPI():
     def __init__(self):
@@ -187,7 +196,7 @@ class GoxAPI():
 
         self.socket.send(call)
 
-intList = IntervalList()
+intList = IntervalList((MovingAverage(), RSI(), MACD()))
 
 if (True): ##placeholder for cmdline parameter
     print "Fetching history from bitcoincharts.com..."
