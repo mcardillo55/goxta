@@ -1,4 +1,5 @@
 import TaLib
+import talib
 
 class Indicator:
     def compute(self, closeList):
@@ -24,7 +25,7 @@ class MovingAverage(Indicator):
     def __init__(self, t=50):
         self.period = t
     def compute(self, closeList):
-        return self.TA_pad_zeros(TaLib.TA_MA(0, len(closeList)-1, closeList, self.period))[-1]
+        return talib.SMA(closeList, self.period)[-1]
     def display(self, closeList):
         print "SMA: %.6g" % (self.compute(closeList))
 

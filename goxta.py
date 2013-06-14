@@ -1,5 +1,6 @@
 from indicators import *
 from goxapi import *
+import numpy as np
 import argparse
 import time
 import math
@@ -24,7 +25,7 @@ class IntervalList:
         closeList = []
         for interval in self.intList:
            closeList.append(interval.close) 
-        return closeList
+        return np.array(closeList)
     def getIntervalPeriod(self):
         return self.intervalPeriod
     def printIntervalAt(self, n):
