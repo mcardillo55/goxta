@@ -5,10 +5,9 @@ The goal of goxta is to create a realtime MtGox trading platform that will suppo
 
 Dependencies
 ------------
-* TA-Lib -  Available at http://www.ta-lib.org (looking to replace with a ta-lib version with more python support)
+* TA-Lib python wrapper - available at http://mrjbq7.github.io/ta-lib/
 
-  Good SWIG compilation instructions can be found [here](http://blog.mediafederation.com/andy-hawkins/getting-ta-lib-to-work-with-python-2-6-swig-interface/)
-* websocket module - I use websocket-client, available on PyPI
+* A websocket module - I use websocket-client, available on PyPI
 
 Configuration
 -------------

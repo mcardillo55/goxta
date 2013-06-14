@@ -1,4 +1,3 @@
-import TaLib
 import talib
 
 class Indicator:
@@ -6,20 +5,6 @@ class Indicator:
         raise NotImplementedError
     def display(self, closeList):
         raise NotImplementedError
-
-    def TA_pad_zeros(self, argvs):
-        end = argvs[1]
-        try:
-            seq = argvs[2]
-        except:
-            seq = [0,0]
-        end = int(end)
-        nseq = []
-        for x in range(end):
-            nseq.append(0)
-        for x in seq:
-            nseq.append(x)
-        return nseq
 
 class MovingAverage(Indicator):
     def __init__(self, t=50):
@@ -33,7 +18,7 @@ class RSI(Indicator):
     def __init__(self, t=14):
         self.period = t
     def compute(self, closeList):
-        return self.TA_pad_zeros(TaLib.TA_RSI(0, len(closeList)-1, closeList, self.period))[-1]
+        return talib.RSI(closeList, self.period)[-1]
     def display(self, closeList):
         print "RSI: %.6g" % (self.compute(closeList))
 
@@ -44,9 +29,8 @@ class MACD(Indicator):
         self.longt = longt
         self.sigt = sigt
     def compute(self, closeList):
-        return self.TA_pad_zeros(TaLib.TA_MACD(0, len(closeList)-1, closeList, self.shortt, \
-                    self.longt, self.sigt))[-1]
+        macd = talib.MACD(closeList, fastperiod=self.shortt, slowperiod=self.longt, signalperiod=self.sigt)
+        return (macd[0][-1], macd[1][-1], macd[2][-1])
     def display(self, closeList):
-        print "MACD: %.6g" % self.compute(closeList)
-
+        print "MACD: %.6g, %.6g, %.6g" % self.compute(closeList)
 
