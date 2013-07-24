@@ -56,6 +56,8 @@ class GoxAPI():
 
         price in dollars as float
         volume in btc as float
+
+        Returns order ID (oid) if successful, False if failed
         """
         price = int(price * 1E5)
         vol = int(vol * 1E8)
@@ -63,13 +65,15 @@ class GoxAPI():
             "type": "bid",
             "amount_int": vol,
             "price_int": price}
-        self.sendSignedCall("order/add", params)
+        return self.sendSignedCall("order/add", params)
 
     def sell(self, price, vol):
         """Executes a sell order
 
         price in dollars as float
         volume in btc as float
+
+        Returns order ID (oid) if successful, False if failed
         """
         price = int(price * 1E5)
         vol = int(vol * 1E8)
@@ -77,18 +81,21 @@ class GoxAPI():
             "type": "ask",
             "amount_int": vol,
             "price_int": price}
-        self.sendSignedCall("order/add", params)
+        return self.sendSignedCall("order/add", params)
 
     def cancel(self, oid):
         """Cancels the order refered by oid"""
         params = {
             "oid": oid}
-        self.sendSignedCall("order/cancel", params)
+        return self.sendSignedCall("order/cancel", params)
 
-    def sendSignedCall(self, api, params):
+    def sendSignedCall(self, api, params=None):
         """Packages required mtGox API data and sends the command
 
         This is a generic function used by both buy and sell commands
+
+        It will return whatever result is specified by the mtGox API if
+        successful, or False if the call failed
         """
         nonce = self.getNonce()
         reqId = hashlib.md5(nonce).hexdigest()
@@ -112,3 +119,15 @@ class GoxAPI():
             "context": "mtgox.com"})
 
         self.socket.send(call)
+
+        while True:
+            result = json.loads(self.socket.recv())
+            try:
+                if (result["id"] == reqId):
+                    try:
+                        if (result["success"] is False):
+                            return False
+                    except Exception, e:
+                        return result["result"]
+            except Exception, e:
+                continue
