@@ -20,16 +20,22 @@ class Indicator:
     def display(self, closeList):
         raise NotImplementedError
 
+    def asStr(self, closeList):
+        raise NotImplementedError
+
 
 class MovingAverage(Indicator):
-    def __init__(self, t=50):
+    def __init__(self, t=10):
         self.period = t
 
     def compute(self, closeList):
         return talib.SMA(closeList, self.period)[-1]
 
     def display(self, closeList):
-        print "SMA: %.6g" % (self.compute(closeList))
+        print "SMA(%d): %.6g" % (self.period, self.compute(closeList))
+
+    def asStr(self, closeList):
+        return "SMA(%d): %.6g" % (self.period, self.compute(closeList))
 
 
 class RSI(Indicator):
@@ -40,7 +46,10 @@ class RSI(Indicator):
         return talib.RSI(closeList, self.period)[-1]
 
     def display(self, closeList):
-        print "RSI: %.6g" % (self.compute(closeList))
+        print "RSI(%d): %.6g" % (self.period, self.compute(closeList))
+
+    def asStr(self, closeList):
+        return "RSI(%d): %.6g" % (self.period, self.compute(closeList))
 
 
 class MACD(Indicator):
@@ -55,4 +64,9 @@ class MACD(Indicator):
         return (macd[0][-1], macd[1][-1], macd[2][-1])
 
     def display(self, closeList):
-        print "MACD: %.6g, %.6g, %.6g" % self.compute(closeList)
+        print "MACD(%d, %d): %.6g, %.6g, %.6g" % ((self.longt, self.shortt)
+                + self.compute(closeList))
+
+    def asStr(self, closeList):
+        return "MACD(%d, %d): %.6g, %.6g, %.6g" % ((self.longt, self.shortt)
+                + self.compute(closeList))

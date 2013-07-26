@@ -1,12 +1,14 @@
 """goxta -- realtime technical analysis on mtGox trading"""
 from indicators import *
 from goxapi import *
+import strategy
 import numpy as np
 import argparse
 import time
 import math
 import sys
 import urllib2
+import thread
 
 BTCCHARTS_URL = "http://api.bitcoincharts.com/v1/trades.csv?symbol=mtgoxUSD"
 
@@ -58,8 +60,10 @@ class IntervalList:
 
     def printIndicators(self):
         closings = self.closings()
+        indStr = ""
         for curInd in self.indicators:
-            curInd.display(closings)
+            indStr = indStr + curInd.asStr(closings) + "\t"
+        print indStr
 
 
 class Interval:
@@ -67,15 +71,29 @@ class Interval:
 
     Contains essential trade prices, as well as all Trade objects that took
     place during the interval interval
+
+    empty is passed True if we are creating an interval with no trading
+    activity
+    open is either the opening trade, or the previous Interval if there is
+    no activity
     """
-    def __init__(self, open):
-        self.intervalID = open.intervalID
-        self.open = open.price
-        self.close = open.price
-        self.trades = [open]
-        self.high = open.price
-        self.low = open.price
-        self.volume = open.volume
+    def __init__(self, open, empty=False):
+        if (empty):
+            self.intervalID = open.intervalID + 1
+            self.open = open.close
+            self.close = open.close
+            self.trades = []
+            self.high = open.close
+            self.low = open.close
+            self.volume = 0
+        else:
+            self.intervalID = open.intervalID
+            self.open = open.price
+            self.close = open.price
+            self.trades = [open]
+            self.high = open.price
+            self.low = open.price
+            self.volume = open.volume
 
     def addTrade(self, trade):
         self.trades.append(trade)
@@ -111,12 +129,13 @@ class Trade:
 
 parser = argparse.ArgumentParser(description="Analyze and trade Bitcoin"
                                              "on mtGox")
-parser.add_argument("--no-hist", dest="history", action="store_false",
-                    help="Disable fetching bitcoincharts.com history")
+parser.add_argument("--hist", dest="history", action="store_true",
+                    help="Grab recent bitcoincharts.com trade history")
 args = parser.parse_args()
 
 # creating main interval list object
-intList = IntervalList(indicators=(MovingAverage(), RSI(), MACD()))
+intList = IntervalList(indicators=(MovingAverage(10), MovingAverage(20),
+                       RSI(), MACD()))
 
 if (args.history):
     print "Fetching history from bitcoincharts.com..."
@@ -133,6 +152,13 @@ if (args.history):
 mtgox = GoxAPI()
 mtgox.connect()
 
+mtgoxThread = GoxAPI()
+mtgoxThread.connect()
+
+tradeStrategy = strategy.Strategy()
+
+#thread.start_new_thread(tradeStrategy.run, (mtgoxThread, ))
+
 while True:
     """Main program loop
 
@@ -140,8 +166,12 @@ while True:
     """
     try:
         mtdata = mtgox.getTrades()
-    except Exception, e:
-        print e
+    except KeyboardInterrupt:
+        print "Received Ctrl+C. Closing goxta..."
+        sys.exit(0)
+    except ssl.SSLError:
+        continue
+    except:
         continue
 
     try:
@@ -149,21 +179,32 @@ while True:
         if (mtdata['channel'] == "dbf1dee9-4f2e-4a08-8cb7-748919a71b21" and
            mtdata['trade']['price_currency'] == "USD"):
             mtTrade = mtdata['trade']
-            curTrade = Trade((mtTrade['date'], mtTrade['price'],
-                            mtTrade['amount']), intList.getIntervalPeriod())
-            curTrade.printTrade()
-            # checking if we should create the first Interval in the list or
-            # if the trade time has passed the the interval end time, in
-            # which we will need to need to create a new Interval
-            if (intList.empty() or
-               curTrade.intervalID != curInterval.intervalID):
-                curInterval = Interval(curTrade)
-                # checking for the case in which we need to create the
-                # first Interval for the list
-                if not intList.empty():
-                    intList.printIntervalAt(-1)
-                intList.addInterval(curInterval)
-            else:
-                curInterval.addTrade(curTrade)
-    except Exception, e:
+        else:
+            mtTrade = None
+    except:
         continue
+
+    if (mtTrade):
+        curTrade = Trade((mtTrade['date'], mtTrade['price'],
+                            mtTrade['amount']), intList.getIntervalPeriod())
+        # checking if we should create the first Interval in the list or
+        # if the trade time has passed the the interval end time, in
+        # which we will need to need to create a new Interval
+        if (intList.empty() or
+           curTrade.intervalID != curInterval.intervalID):
+            curInterval = Interval(curTrade)
+            # checking for the case in which we need to create the
+            # first Interval for the list
+            if not intList.empty():
+                intList.printIntervalAt(-1)
+                idDiff = (curInterval.intervalID -
+                         intList.intList[-1].intervalID)
+                if (idDiff != 1):
+                    for x in range(1, idDiff):
+                        intList.addInterval(Interval(intList.intList[-1],
+                                            True))
+                        intList.printIntervalAt(-1)
+            intList.addInterval(curInterval)
+        else:
+            curInterval.addTrade(curTrade)
+        curTrade.printTrade()
