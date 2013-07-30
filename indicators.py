@@ -39,6 +39,7 @@ class SMA(Indicator):
     def asStr(self, closeList):
         return "SMA(%d): %.6g" % (self.period, self.compute(closeList))
 
+
 class EMA(Indicator):
     def __init__(self, t=10):
         self.period = t
@@ -53,6 +54,7 @@ class EMA(Indicator):
 
     def asStr(self, closeList):
         return "EMA(%d): %.6g" % (self.period, self.compute(closeList))
+
 
 class RSI(Indicator):
     def __init__(self, t=14):

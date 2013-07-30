@@ -145,18 +145,19 @@ if (args.history):
     start_data = urllib2.urlopen(BTCCHARTS_URL)
     for line in reversed(start_data.readlines()):
         curTrade = Trade(tuple(line.split(",")), intList.getIntervalPeriod())
+        #curTrade.printTrade()
         if intList.empty() or curTrade.intervalID != curInterval.intervalID:
-           curInterval = Interval(curTrade)
-           if not intList.empty():
-               intList.printIntervalAt(-1)
-               idDiff = (curInterval.intervalID -
-                        intList.intList[-1].intervalID)
-               if (idDiff != 1):
-                   for x in range(1, idDiff):
-                       intList.addInterval(Interval(intList.intList[-1],
-                                           True))
-                       intList.printIntervalAt(-1)
-           intList.addInterval(curInterval)
+            curInterval = Interval(curTrade)
+            if not intList.empty():
+                intList.printIntervalAt(-1)
+                idDiff = (curInterval.intervalID -
+                         intList.intList[-1].intervalID)
+                if (idDiff != 1):
+                    for x in range(1, idDiff):
+                        intList.addInterval(Interval(intList.intList[-1],
+                                            True))
+                        intList.printIntervalAt(-1)
+            intList.addInterval(curInterval)
         else:
             curInterval.addTrade(curTrade)
     print "Complete!"
@@ -169,7 +170,7 @@ mtgoxThread.connect()
 
 tradeStrategy = strategy.Strategy(intList)
 
-#thread.start_new_thread(tradeStrategy.run, (mtgoxThread, ))
+thread.start_new_thread(tradeStrategy.run, (mtgoxThread, ))
 
 while True:
     """Main program loop
