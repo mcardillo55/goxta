@@ -24,12 +24,14 @@ class Indicator:
         raise NotImplementedError
 
 
-class MovingAverage(Indicator):
+class SMA(Indicator):
     def __init__(self, t=10):
         self.period = t
+        self.last = float('nan')
 
     def compute(self, closeList):
-        return talib.SMA(closeList, self.period)[-1]
+        self.last = talib.SMA(closeList, self.period)[-1]
+        return self.last
 
     def display(self, closeList):
         print "SMA(%d): %.6g" % (self.period, self.compute(closeList))
@@ -37,13 +39,29 @@ class MovingAverage(Indicator):
     def asStr(self, closeList):
         return "SMA(%d): %.6g" % (self.period, self.compute(closeList))
 
+class EMA(Indicator):
+    def __init__(self, t=10):
+        self.period = t
+        self.last = float('nan')
+
+    def compute(self, closeList):
+        self.last = talib.EMA(closeList, self.period)[-1]
+        return self.last
+
+    def display(self, closeList):
+        print "EMA(%d): %.6g" % (self.period, self.compute(closeList))
+
+    def asStr(self, closeList):
+        return "EMA(%d): %.6g" % (self.period, self.compute(closeList))
 
 class RSI(Indicator):
     def __init__(self, t=14):
         self.period = t
+        self.last = float('nan')
 
     def compute(self, closeList):
-        return talib.RSI(closeList, self.period)[-1]
+        self.last = talib.RSI(closeList, self.period)[-1]
+        return self.last
 
     def display(self, closeList):
         print "RSI(%d): %.6g" % (self.period, self.compute(closeList))
@@ -57,11 +75,13 @@ class MACD(Indicator):
         self.shortt = shortt
         self.longt = longt
         self.sigt = sigt
+        self.last = float('nan')
 
     def compute(self, closeList):
         macd = talib.MACD(closeList, fastperiod=self.shortt,
                           slowperiod=self.longt, signalperiod=self.sigt)
-        return (macd[0][-1], macd[1][-1], macd[2][-1])
+        self.last = (macd[0][-1], macd[1][-1], macd[2][-1])
+        return self.last
 
     def display(self, closeList):
         print "MACD(%d, %d): %.6g, %.6g, %.6g" % ((self.longt, self.shortt)

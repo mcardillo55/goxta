@@ -134,7 +134,7 @@ parser.add_argument("--hist", dest="history", action="store_true",
 args = parser.parse_args()
 
 # creating main interval list object
-intList = IntervalList(indicators=(MovingAverage(10), MovingAverage(20),
+intList = IntervalList(intervalPeriod=15, indicators=(SMA(40), EMA(20),
                        RSI(), MACD()))
 
 if (args.history):
