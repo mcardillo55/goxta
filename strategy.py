@@ -1,7 +1,12 @@
 import time
+import math
 
 
 class Strategy:
+    def __init__(self, intList):
+        self.intList = intList
+        self.indicators = intList.indicators
+
     def addRule(self):
         return
 

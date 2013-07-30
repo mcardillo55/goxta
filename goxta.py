@@ -167,7 +167,7 @@ mtgox.connect()
 mtgoxThread = GoxAPI()
 mtgoxThread.connect()
 
-tradeStrategy = strategy.Strategy()
+tradeStrategy = strategy.Strategy(intList)
 
 #thread.start_new_thread(tradeStrategy.run, (mtgoxThread, ))
 
