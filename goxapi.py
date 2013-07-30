@@ -9,9 +9,11 @@ import time
 import hashlib
 import hmac
 import base64
+import ssl
 
 MTGOX_SOCKET = "wss://websocket.mtgox.com/mtgox?Currency=USD"
 TIMEOUT = 10
+MAX_TIMEOUTS = 10
 
 
 class GoxAPI():
@@ -21,6 +23,7 @@ class GoxAPI():
         keyjson = json.loads(keydata.read())
         self.key = keyjson['key']
         self.secret = keyjson['secret']
+        self.numTimeouts = 0
         keydata.close()
 
     def connect(self):
@@ -34,6 +37,11 @@ class GoxAPI():
         self.socket = sock
         return sock
 
+    def reconnect(self):
+        self.socket.close()
+        print "Max timeouts occurred. Reconnecting to websocket..."
+        return self.connect()
+
     def getNonce(self):
         """Generates a unique identifier used when placing orders"""
         return str(time.time())
@@ -43,9 +51,14 @@ class GoxAPI():
         if self.socket is not None:
             try:
                 data = json.loads(self.socket.recv())
-            except Exception, e:
-                print e
+            except ssl.SSLError:
+                self.numTimeouts += 1
+                if (self.numTimeouts == MAX_TIMEOUTS):
+                    self.reconnect()
                 return None
+            except Exception:
+                return None
+            self.numTimeouts = 0
             return data
         else:
             print "Error: Not connected to mtGox socket"
