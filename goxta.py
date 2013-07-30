@@ -9,6 +9,7 @@ import math
 import sys
 import urllib2
 import thread
+import random
 
 BTCCHARTS_URL = "http://api.bitcoincharts.com/v1/trades.csv?symbol=mtgoxUSD"
 
@@ -131,6 +132,8 @@ parser = argparse.ArgumentParser(description="Analyze and trade Bitcoin"
                                              "on mtGox")
 parser.add_argument("--hist", dest="history", action="store_true",
                     help="Grab recent bitcoincharts.com trade history")
+parser.add_argument("--test", dest="testMode", action="store_true",
+                    help="Create consistant fake trade data for testing")
 args = parser.parse_args()
 
 # creating main interval list object
@@ -173,25 +176,28 @@ while True:
 
     Will keep recieving trade data until process dies
     """
-    try:
-        mtdata = mtgox.getTrades()
-    except KeyboardInterrupt:
-        print "Received Ctrl+C. Closing goxta..."
-        sys.exit(0)
-    except ssl.SSLError:
-        continue
-    except:
-        continue
+    if (args.testMode):
+        time.sleep(5)
+        mtTrade = {'date': time.time(), 'price': random.uniform(88, 98),
+                   'amount': random.uniform(0.01, 3.0)}
+    else:
+        try:
+            mtdata = mtgox.getTrades()
+        except KeyboardInterrupt:
+            print "Received Ctrl+C. Closing goxta..."
+            sys.exit(0)
+        except:
+            continue
 
-    try:
-        # this is the 'trades' channel identifier, according to API docs
-        if (mtdata['channel'] == "dbf1dee9-4f2e-4a08-8cb7-748919a71b21" and
-           mtdata['trade']['price_currency'] == "USD"):
-            mtTrade = mtdata['trade']
-        else:
-            mtTrade = None
-    except:
-        continue
+        try:
+            # this is the 'trades' channel identifier, according to API docs
+            if (mtdata['channel'] == "dbf1dee9-4f2e-4a08-8cb7-748919a71b21" and
+               mtdata['trade']['price_currency'] == "USD"):
+                mtTrade = mtdata['trade']
+            else:
+                mtTrade = None
+        except:
+            continue
 
     if (mtTrade):
         curTrade = Trade((mtTrade['date'], mtTrade['price'],
